@@ -1,0 +1,464 @@
+## Chatbot baseado no ChatGPT
+Este é um projeto de caráter educativo desenvolvido com base no curso \
+*ChatGPT Prompt Engineering for Developers*, disponível na plataforma \
+online DeepLearning.AI:
+- https://www.deeplearning.ai/courses/chatgpt-prompt-eng   
+
+### Setup
+
+Este projeto utiliza o **Google Colab** como ambiente de desenvolvimento e execução de *Jupyter Notebooks*, permitindo a implementação e o teste de aplicações baseadas em Large Language Models (LLMs).
+
+Em vez de utilizar a API paga da OpenAI, foi adotado o modelo **GPT-OSS 20B**, disponibilizado pela OpenAI para execução local.
+
+O modelo foi instalado e executado por meio do **Ollama**, utilizando a GPU **NVIDIA Tesla T4**, disponibilizada pelo Google Colab. Essa abordagem permite realizar inferências diretamente no ambiente de execução, sem a necessidade de uma chave de API ou de pagamentos por tokens processados.
+
+Para manter a compatibilidade com os exemplos apresentados no curso *ChatGPT Prompt Engineering for Developers*, foi utilizada a biblioteca `openai` do Python, configurada para se comunicar com o servidor local do Ollama por meio de sua API compatível com a OpenAI.
+
+**Tecnologias utilizadas:**
+- **Google Colab:** ambiente de desenvolvimento e execução dos notebooks.
+- **Python:** linguagem de programação principal.
+- **GPT-OSS 20B:** modelo de linguagem desenvolvido pela OpenAI.
+- **Ollama:** ferramenta responsável pelo gerenciamento e execução do modelo.
+- **NVIDIA Tesla T4:** GPU utilizada para acelerar as inferências.
+- **OpenAI Python SDK:** biblioteca utilizada para realizar requisições ao modelo por meio da API local do Ollama.
+- **Panel:** biblioteca utilizada na construção da interface interativa do chatbot.
+
+Essa configuração possibilita explorar os conceitos de *prompt engineering*, processamento de linguagem natural e desenvolvimento de chatbots sem depender de serviços pagos de inferência, respeitando os limites de recursos e disponibilidade do Google Colab.
+
+# Inicialização do servidor local do Ollama
+#
+# O servidor Ollama precisa permanecer ativo para receber as
+# requisições realizadas durante a execução do Notebook.
+#
+# Entretanto, executar diretamente `!ollama serve` bloquearia
+# a célula, pois o servidor é um processo de longa duração.
+#
+# Para evitar isso, utilizamos subprocess.Popen(), que permite
+# iniciar o servidor em um processo independente.
+#
+# Parâmetros:
+# - stdout=subprocess.DEVNULL: descarta a saída padrão.
+# - stderr=subprocess.DEVNULL: descarta os logs de erro.
+# - start_new_session=True: inicia uma nova sessão de processo.
+#
+# Antes de iniciar o servidor, verificamos se ele já está ativo.
+
+import subprocess
+import time
+import urllib.request
+
+OLLAMA_URL = "http://127.0.0.1:11434/api/version"
+
+def ollama_ativo():
+    try:
+        with urllib.request.urlopen(OLLAMA_URL, timeout=2) as response:
+            return response.status == 200
+    except Exception:
+        return False
+
+
+if not ollama_ativo():
+
+    server = subprocess.Popen(
+        ["ollama", "serve"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True
+    )
+
+    # Aguarda a inicialização do servidor
+    for _ in range(30):
+        if ollama_ativo():
+            break
+        time.sleep(1)
+
+    if ollama_ativo():
+        print("Servidor Ollama iniciado com sucesso!")
+    else:
+        print("Erro: o servidor Ollama não respondeu.")
+
+else:
+    print("O servidor Ollama já está em execução!")
+
+# Instala o modelo GPT-OSS:20B
+!ollama pull gpt-oss:20b 
+
+!ollama run gpt-oss:20b         # Inicializa a execução do modelo
+
+import os
+from openai import OpenAI
+
+load_dotenv()
+
+# Utilizando o Ollama para carregar um modelo do ChatGPT
+client = OpenAI(
+    base_url="http://localhost:11434/v1",
+    api_key="ollama"
+)
+
+# Modelo utilizado: GPT-OSS 20B no ambiente Colab do Google
+def get_completion(prompt, model="gpt-oss:20b", client=client):
+    stream = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "user", "content": prompt}
+        ],
+        stream=True,
+        max_completion_tokens=4096,
+        reasoning_effort="low",
+        extra_body={
+            "keep_alive": "5m",
+            "options": {"num_ctx": 4096}
+        }
+    )
+
+    # Modificação para imprimir a resposta do modelo em tempo real
+    resposta = ""
+
+    for chunk in stream:
+        delta = chunk.choices[0].delta
+        if delta.content:
+            print(delta.content, end="", flush=True)
+            resposta += delta.content
+
+    print()
+    return resposta
+
+# teste inicial para verificar a resposta do modelo
+text = f"""
+In ChatGPT Prompt Engineering for Developers, you will learn how to use a \
+large language model (LLM) to quickly build new and powerful applications. \
+Using the OpenAI API, you’ll be able to quickly build capabilities that \
+learn to innovate and create value in ways that were cost-prohibitive, \
+highly technical, or simply impossible before now. This short course taught \
+by Isa Fulford (OpenAI) and Andrew Ng (DeepLearning.AI) will describe how \
+LLMs work, provide best practices for prompt engineering, and show how LLM \
+APIs can be used in applications for a variety of tasks, including:
+"""
+
+prompt = f"""
+Summarize the text delimited by #### into a single sentence.
+#### {text} ####
+"""
+
+response = get_completion(prompt)
+#print(response)        # Não é necessário pois get_completion() já imprime a saída do modelo, incluindo seu processo de pensamento
+
+### Adicionando instruções:
+Instruções são adicionadas ao prompt de forma que guiem o modelo \
+para que entregue a resposta desejada
+
+# Adicionando uma instrução para quebra de linha após 5 palavras
+text = f"""
+In ChatGPT Prompt Engineering for Developers, you will learn how to use a \
+large language model (LLM) to quickly build new and powerful applications. \
+Using the OpenAI API, you’ll be able to quickly build capabilities that \
+learn to innovate and create value in ways that were cost-prohibitive, \
+highly technical, or simply impossible before now. This short course taught \
+by Isa Fulford (OpenAI) and Andrew Ng (DeepLearning.AI) will describe how \
+LLMs work, provide best practices for prompt engineering, and show how LLM \
+APIs can be used in applications for a variety of tasks, including:
+"""
+
+prompt = f"""
+Summarize the text delimited by #### into a single sentence. \
+Add a breakline character after 60 characters each line, if \
+it's in the midle of a word, breakline after it.
+#### {text} ####
+"""
+
+response = get_completion(prompt)
+
+### Adicionando passo-a-passo
+Isto pormite que o modelo tenha tempo para "pensar", \
+especificando os passos para executar uma tarefa.
+
+text = f"""
+In ChatGPT Prompt Engineering for Developers, you will learn how to use a \
+large language model (LLM) to quickly build new and powerful applications. \
+Using the OpenAI API, you’ll be able to quickly build capabilities that \
+learn to innovate and create value in ways that were cost-prohibitive, \
+highly technical, or simply impossible before now. This short course taught \
+by Isa Fulford (OpenAI) and Andrew Ng (DeepLearning.AI) will describe how \
+LLMs work, provide best practices for prompt engineering, and show how LLM \
+APIs can be used in applications for a variety of tasks, including:
+"""
+
+prompt = f"""
+Perform the following steps: \
+1 - Summarize the text delimited by #### into a single sentence. \
+2 - Translate the summarized text to portuguese \
+3 - Add a breakline character after 60 characters each line of the translated text. \
+4 - Verify if the previous steps were done correctly, if not \
+indicate witch step was incorrect. \
+
+Add breaklines after each step.
+#### {text} ####
+"""
+
+response = get_completion(prompt)
+
+text_1 = f"""
+Boa noite! Gostaria de saber quais sabores de pizza vocês
+têm disponíveis e os preços dos tamanhos médio e grande.
+Estou pensando em pedir duas pizzas para minha família, uma
+de calabresa e outra de quatro queijos. Vocês oferecem alguma
+promoção para pedidos com mais de uma pizza? Também gostaria de
+saber se entregam no bairro Centro e qual é a taxa de entrega.
+"""
+
+text_2 = f"""
+Olá, boa noite. Fiz um pedido há aproximadamente uma hora e meia
+e minha pizza ainda não chegou. Quando entrei em contato anteriormente,
+me informaram que a entrega levaria no máximo 40 minutos. Além disso,
+na última vez que pedi, a pizza chegou fria e com um sabor diferente do
+solicitado. Gostaria de saber o que aconteceu com meu pedido e se existe
+alguma previsão de entrega.
+"""
+
+text_3 = f"""
+Oi, tudo bem? Gostaria de fazer um pedido para hoje à noite, mas tenho
+algumas dúvidas. Vocês oferecem pizzas vegetarianas ou opções sem lactose?
+Minha namorada não consome carne e eu tenho intolerância à lactose. Estávamos
+pensando em pedir uma pizza grande, metade vegetariana e metade marguerita sem
+queijo. É possível fazer essas alterações? Também gostaria de saber quais são
+as formas de pagamento e se aceitam Pix.
+"""
+
+texts = [text_1, text_2, text_3]
+
+for text in texts:
+  prompt = f"""
+  You are an AI assistant for a pizza restaurant, your job is to \
+  read messages sent from the clients delimited by #### and classify them in acordance \
+  to: sentiment (satisfied, happy, neutral, angry, sad, disappointed), \
+  kind (order, complaint, review), and extract information such as: \
+  items (pizza flavor, drinks, and others), address and observations. \
+  format your answers as JASON with the following keys: \
+  sentiment, kind, items, address, observation.
+
+  Review text: ####{text}###
+  """
+
+  response = get_completion(prompt)
+
+  # Função para ler diversas mensagens, e não apenas 1 prompt
+def get_completion_from_messages(messages, model="gpt-oss:20b", client=client):
+    stream = client.chat.completions.create(
+        model=model,
+        messages=messages,
+        stream=True,
+    )
+    resposta = ""
+
+    for chunk in stream:
+        delta = chunk.choices[0].delta
+        if delta.content:
+            print(delta.content, end="", flush=True)
+            resposta += delta.content
+
+    print()
+    return resposta
+
+import panel as pn # Para GUI
+pn.extension()
+
+panels=[]
+
+# Esta parte é apenas para exibição
+chat_area = pn.Column(
+    height=400,
+    scroll=True,
+    sizing_mode="stretch_width",
+    styles={
+        "background": "#F1F5F9",
+        "padding": "15px",
+        "border-radius": "10px"
+    }
+)
+
+def criar_mensagem(autor, mensagem):
+    usuario = autor == "Usuário"
+
+    return pn.Column(
+        pn.pane.Markdown(
+            f"**{autor}**",
+            styles={
+                "color": "#334155",
+                "font-weight": "bold"
+            }
+        ),
+        pn.pane.Markdown(
+            mensagem,
+            styles={
+                "color": "#111827",
+                "background": "#DBEAFE" if usuario else "#FFFFFF",
+                "padding": "12px",
+                "border-radius": "10px",
+                "overflow-wrap": "anywhere"
+            },
+            sizing_mode="stretch_width"
+        ),
+        styles={
+            "margin-bottom": "12px"
+        },
+        sizing_mode="stretch_width"
+    )
+
+# Recebe a mensagem do usuário e chama a resposta do modelo
+def collect_messages(event):
+    prompt = inp.value.strip()
+
+    if not prompt:
+        return
+
+    inp.value = ""
+
+    context.append({
+        "role": "user",
+        "content": prompt
+    })
+
+    chat_area.append(criar_mensagem("Usuário", prompt))
+
+    try:
+        response = get_completion_from_messages(context)
+
+        context.append({
+            "role": "assistant",
+            "content": response
+        })
+
+        chat_area.append(
+            criar_mensagem("Assistente", response)
+        )
+
+    except Exception as erro:
+        chat_area.append(
+            criar_mensagem("Erro", str(erro))
+        )
+
+
+### Chatbot pizzaria
+Adicionando o contexto de uma pizzaria ao ChatBot, repassando todas as informações necessárias e instruções para o atendimento.
+
+context = [ {'role':'system', 'content': """
+Você é um ChatBot responsável pelo atendimento automatizado de uma pizzaria.
+Primeiro você deve comprimentar o cliente, apresentar a pizzaria, apresentar o cardápio,
+coletar o pedido, perguntar se é uma entrega ou busca no balcão. Espere para coletar o
+pedido completo então resuma isto e verifique se o cliente não deseja adicionar
+mais alguma coisa, ou se deseja adicionar alguma observação. Caso não tenha adicionado
+alguma bebida, pergunte se o cliente não deseja adicionar ao pedido. Se for entrega,
+pergunte o endereço. Pergunte pelo método de pagamento e por fim pergunte se deseja
+finalizar o pedido. Tenha certeza de clarificar todas as opções, extras e identifique
+o item do menu. Responda de maneira curta e amigável. O preço das pizzas meio a meio
+são sempre o valor da pizza mais cara.
+Informações da Pizzaria:
+ "nome": "Pizzaria Bella Napoli",
+    "horario_funcionamento": "18:00 às 23:30",
+    "dias_funcionamento": "Terça-feira a domingo",
+    "tempo_entrega": "30 a 50 minutos",
+    "taxa_entrega": 7.00,
+    "formas_pagamento": [
+        "Pix",
+        "Cartão de crédito",
+        "Cartão de débito",
+        "Dinheiro"
+    ],
+    "tamanhos": {
+        "Média": "6 fatias",
+        "Grande": "8 fatias",
+        "Família": "12 fatias"
+    },
+    "observacoes": [
+        "Pizzas meio a meio são permitidas.",
+        "O valor da pizza meio a meio corresponde ao sabor mais caro.",
+        "Ingredientes adicionais podem ter custo extra.",
+        "O pedido mínimo para entrega é de R$ 30,00."
+    ]
+
+o menu inclui:
+"Pizzas Tradicionais": {
+        "Margherita": {"Pequena": 25.90, "Média": 34.90, "Grande": 42.90},
+        "Calabresa": {"Pequena": 27.90, "Média": 36.90, "Grande": 44.90},
+        "Mussarela": {"Pequena": 23.90, "Média": 31.90, "Grande": 39.90},
+        "Portuguesa": {"Pequena": 29.90, "Média": 39.90, "Grande": 49.90},
+        "Frango com Catupiry": {"Pequena": 28.90, "Média": 38.90, "Grande": 48.90},
+        "Quatro Queijos": {"Pequena": 31.90, "Média": 42.90, "Grande": 52.90},
+        "Napolitana": {"Pequena": 27.90, "Média": 37.90, "Grande": 45.90},
+        "Milho com Bacon": {"Pequena": 28.90, "Média": 38.90, "Grande": 46.90}
+    },
+
+    "Pizzas Especiais": {
+        "Pepperoni": {"Pequena": 32.90, "Média": 44.90, "Grande": 54.90},
+        "Carne Seca com Catupiry": {"Pequena": 35.90, "Média": 48.90, "Grande": 59.90},
+        "Camarão": {"Pequena": 42.90, "Média": 56.90, "Grande": 69.90},
+        "Vegetariana": {"Pequena": 29.90, "Média": 39.90, "Grande": 49.90},
+        "Rúcula com Tomate Seco": {"Pequena": 31.90, "Média": 43.90, "Grande": 53.90},
+        "Brócolis com Bacon": {"Pequena": 30.90, "Média": 41.90, "Grande": 51.90}
+    },
+
+    "Pizzas Doces": {
+        "Chocolate": {"Pequena": 23.90, "Média": 31.90, "Grande": 39.90},
+        "Chocolate com Morango": {"Pequena": 26.90, "Média": 36.90, "Grande": 44.90},
+        "Romeu e Julieta": {"Pequena": 25.90, "Média": 34.90, "Grande": 42.90},
+        "Banana com Canela": {"Pequena": 22.90, "Média": 30.90, "Grande": 38.90},
+        "Prestígio": {"Pequena": 25.90, "Média": 35.90, "Grande": 43.90}
+    },
+
+    "Bebidas": {
+        "Coca-Cola 2L": 14.00,
+        "Guaraná 2L": 12.00,
+        "Sprite 2L": 12.00,
+        "Refrigerante Lata 350ml": 6.00,
+        "Suco Natural 500ml": 9.00,
+        "Água Mineral 500ml": 4.00
+    },
+
+    "Acompanhamentos": {
+        "Pão de Alho": 14.90,
+        "Batata Frita": 19.90,
+        "Nuggets (10 unidades)": 17.90,
+        "Molho Extra": 3.00
+    },
+
+    "Combos": {
+        "Combo Família": 99.90,
+        "Combo Casal": 64.90,
+        "Combo Individual": 39.90
+    }
+"""
+}]
+
+inp = pn.widgets.TextInput(
+    value="",
+    placeholder="Digite sua mensagem...",
+    sizing_mode="stretch_width"
+)
+
+button_conversation = pn.widgets.Button(
+    name="Enviar mensagem",
+    button_type="primary",
+    width=150
+)
+
+button_conversation.on_click(collect_messages)
+
+dashboard = pn.Column(
+    pn.pane.Markdown(
+        "## 🍕 Pizzaria Bella Napoli",
+        styles={"color": "#FFFFFF"}
+    ),
+    chat_area,
+    inp,
+    button_conversation,
+    sizing_mode="stretch_width",
+    styles={
+        "background": "#1E293B",
+        "padding": "20px",
+        "border-radius": "12px"
+    }
+)
+
+dashboard
+
