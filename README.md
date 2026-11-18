@@ -31,7 +31,7 @@ Nota: o GPT-OSS 20B foi desenvolvido pela OpenAI, mas não é o mesmo serviço n
 | Panel | Construção da interface gráfica do chatbot |
 
 ## Arquitetura
-
+```text
 Usuário
    │
    ▼
@@ -58,7 +58,7 @@ collect_messages() ───► context (system / user / assistant)
                    │
                    ▼
         Resposta → histórico e Panel
-
+```
 
 O `system prompt` define o papel de atendente e inclui informações fictícias da Pizzaria Bella Napoli: horários, entrega, pagamento, regras de montagem do pedido e preços do cardápio. Os próximos turnos são acrescentados à lista `context`, permitindo que o modelo considere o diálogo anterior.
 
