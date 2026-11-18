@@ -1,4 +1,4 @@
-# 🍕 Chatbot com GPT-OSS 20B — Prompt Engineering e Atendimento de Pizzaria
+# Chatbot com GPT-OSS 20B — Prompt Engineering e Atendimento de Pizzaria
 
 Projeto educacional em Python e Jupyter Notebook inspirado no curso [ChatGPT Prompt Engineering for Developers](https://www.deeplearning.ai/courses/chatgpt-prompt-eng/), da DeepLearning.AI, ministrado por Isa Fulford e Andrew Ng.
 
